@@ -5,74 +5,131 @@ import java.lang.ProcessBuilder;
 import java.util.List;
 import java.util.Arrays;
 import java.io.File;
+import java.nio.file.Paths;
+import java.nio.file.Path;
 import java.util.Properties;
+import java.nio.file.Files;
+import java.lang.StringBuilder;
+import java.util.HashMap;
 
-public class Shell {
+
+public class Shell implements Runnable {
   String currentDir;
   BufferedReader inputBuffer = null;
   Process p;
   Properties options;
   boolean hasExecuted = false;
   String lastCmd = null;
-  static boolean debug = false;
-  static String block;
+  
+  //folder for 'cd'
+  HashMap<Integer, String> currentFolder = null;
+  int folderCursor = -1;
+  
   static boolean debugPropFlag = false;
+  static boolean debug = false;
+	
+  static String block;
   static boolean EXEC = true;
-  public static void run(String[] args, Properties prop) {
-    if (Arrays.asList(args).contains("--debug") || Arrays.asList(args).contains("-d")) {
+  
+  char terminator;
+  
+  public Shell(String[] args, Properties prop, char os) {
+	  options = prop;
+	  terminator = os;
+	  currentFolder = new HashMap<Integer, String>();
+	  
+	  String[] userdir = System.getProperty("user.dir").split("\\\\");
+	  for (int i = 0; i < userdir.length; i++) {
+	    currentFolder.put(i, userdir[i]);
+	  }
+	  folderCursor = currentFolder.size()-1;
+	
+	  init(args, prop);
+  }
+  
+  public void init(String[] args, Properties prop) {
+	if (Arrays.asList(args).contains("--debug") || Arrays.asList(args).contains("-d")) {
       debug = true;
     }
-
+	
     //set properties
-    String block2 = prop.getProperty("BLOCK");
-    if (block2.equals(".USERNAME")) {
-      block = System.getProperty("user.name");
-    } else {
-      block = block2;
-    }
+    block = prop.getProperty("BLOCK");
     debugPropFlag = Boolean.parseBoolean(prop.getProperty("DEBUG"));
     EXEC = Boolean.parseBoolean(prop.getProperty("EXEC"));
-    Thread t = new Thread();
+  }
+  
+  @Override
+  public void run() {
+	  //annoying...
+	  start();
+  }
+  public void start() {
+	/* Thread t = new Thread();
     Runtime.getRuntime().addShutdownHook(new Thread() {
       public void run() {
-        Shell s = new Shell();
+        Shell s = new Shell(null, null, '/');
         if(s.hasExecuted) {
+			//if externalProcessIsRunning (forced by keystroke)
           s.p.destroy();
-        }
+        } else {
+			Runtime.getRuntime().exit(0);
+		}
       }
-    });
-
-    Shell obj = new Shell();
-    obj.loop();
+    }); */
+	
+    //calls shell;
+    loop();
   }
 
-  public void debug(String cmd) {
+  public void debug(Object cmd) {
     if (debugPropFlag || debug) {
       System.out.println("[DEBUG]" + cmd.toString());
     }
   }
-
+  
+  public String getCurrentDir() {
+	  StringBuilder sb = new StringBuilder();
+	  for (int i = 0; i < currentFolder.size(); i++) {
+		  sb.append(currentFolder.get(i) + terminator);
+	  }
+	  return sb.toString();
+  }
+  
   public boolean isDebug() {
     return debugPropFlag || debug;
   }
 
+  public String outputBlock() {
+	    switch (block) {
+		  case ".USERNAME":
+			return System.getProperty("user.name") + ">";
+		  case ".DIR":
+		    return getCurrentDir() + ">";
+		  default:
+		    return block;
+	    }
+  }
   public void loop() {
     String line;
-    currentDir = System.getProperty("user.dir");
     boolean status;
     inputBuffer = new BufferedReader(new InputStreamReader(System.in));
 
     do {
       line = readLine();
-      List<String> args = splitLine(line);
-      status = execProgram(args);
+	  List<String> args = null;
+	  try {
+		args = splitLine(line);
+      } catch (java.lang.NullPointerException p) {
+		  System.exit(0);
+	  }
+	  status = execProgram(args);
     } while (status);
   }
 
   private String readLine() {
     String words = new String();
-    try { //TODO implement custom offset message (via Properties)
-      System.out.print(block + ">");
+    try {
+      System.out.print(outputBlock()); 
       words = inputBuffer.readLine();
     } catch (IOException e) {
       e.printStackTrace();
@@ -81,7 +138,7 @@ public class Shell {
   }
 
   private List<String> splitLine(String line) {
-    List<String> cmd = Arrays.asList(line.split("\\s"));
+    List<String> cmd = Arrays.asList(line.split(" "));
     return cmd;
   }
 
@@ -91,8 +148,8 @@ public class Shell {
 
     switch (command.get(0)) {
       case("hello"):
-        System.out.println("Hello, World!");
-        break;
+        System.out.println("Hello, World");
+		break;
       case("help"):
         System.out.println("Shell 0.1b ");
         System.out.println("Built-ins: ");
@@ -106,7 +163,8 @@ public class Shell {
         System.out.println("Godbye!");
         System.exit(0);
       case("getdir"):
-          debug(currentDir);
+          //debug(currentFolder);
+		  System.out.println(currentFolder);
           if(isDebug()) {
             System.out.println("Enable Debug mode to run this command");
           }
@@ -122,7 +180,33 @@ public class Shell {
         break;
       case "meow":
         System.out.println("Meow.");
-	break;
+		break;
+	  case "cd":
+	    StringBuilder completePath = new StringBuilder(); //strings
+		//completePath.append(String.join("\\", currentFolder));
+		debug("Complete String: " + getCurrentDir());
+		if (command.size() == 1 || command.get(1).equals("--help")) {
+			System.out.println("cd: Help me."); //TODO Help
+			break;
+		} else if (command.get(1).equals("..") && folderCursor != 0) {
+				currentFolder.remove(folderCursor);
+				folderCursor--;
+				debug("cd: " + currentFolder.toString());
+				debug(folderCursor);
+				break;
+		} else {
+			//check if directory exists
+			File f = new File(getCurrentDir() + command.get(1));
+			if (f.isDirectory()) {
+				folderCursor++;
+				currentFolder.put(folderCursor, command.get(1));
+				debug("cd: " + currentFolder.toString());
+				break;
+			} else {
+				debug("folder not found");
+				break;
+			}
+		}	
       default:
         externRun(command);
         break;
@@ -139,9 +223,11 @@ public class Shell {
   private boolean externRun(List<String> command) {
     try {
       p = new ProcessBuilder(command).inheritIO().start();
+	  hasExecuted = true; //sets the exec flag true for shutdown hook
        try {
         p.waitFor();
-	debug("Exit Value: " + p.exitValue());
+	    debug("Exit Value: " + p.exitValue());
+		hasExecuted = false; //releases hook
         lastCmd = String.join(" ", command);
         return true;
         } catch (InterruptedException e) {
