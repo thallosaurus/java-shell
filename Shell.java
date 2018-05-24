@@ -70,11 +70,10 @@ public class Shell {
   }
 
   private String readLine() {
-    String words = "";
-    try { //TODO implement custom offset message (via JavaProperties)
+    String words = new String();
+    try { //TODO implement custom offset message (via Properties)
       System.out.print(block + ">");
       words = inputBuffer.readLine();
-      //return words;
     } catch (IOException e) {
       e.printStackTrace();
     }
