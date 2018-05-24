@@ -112,7 +112,7 @@ public class Shell {
           }
         break;
       case("!"):
-	System.out.println(lastCmd);
+	    System.out.println(lastCmd);
 	try {
 	  externRun(splitLine(lastCmd));
         } catch (NullPointerException e) {
