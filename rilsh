@@ -1,4 +1,4 @@
 #!/bin/sh
 
-java Shell
+java Bootstrap
 exit

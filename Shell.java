@@ -17,17 +17,22 @@ public class Shell {
   static boolean debug = false;
   static String block;
   static boolean debugPropFlag = false;
+  static boolean EXEC = true;
   public static void run(String[] args, Properties prop) {
     if (Arrays.asList(args).contains("--debug") || Arrays.asList(args).contains("-d")) {
       debug = true;
     }
 
     //set properties
-    block = prop.getProperty("BLOCK");
+    String block2 = prop.getProperty("BLOCK");
+    if (block2.equals(".USERNAME")) {
+      block = System.getProperty("user.name");
+    } else {
+      block = block2;
+    }
     debugPropFlag = Boolean.parseBoolean(prop.getProperty("DEBUG"));
-
+    EXEC = Boolean.parseBoolean(prop.getProperty("EXEC"));
     Thread t = new Thread();
-
     Runtime.getRuntime().addShutdownHook(new Thread() {
       public void run() {
         Shell s = new Shell();
@@ -84,7 +89,7 @@ public class Shell {
   private boolean execProgram(List<String> command) {
     debug("< " + String.join(" ", command));
     //shell builtin
-    
+
     switch (command.get(0)) {
       case("hello"):
         System.out.println("Hello, World!");
@@ -116,6 +121,9 @@ public class Shell {
 	  break;
         }
         break;
+      case "meow":
+        System.out.println("Meow.");
+	break;
       default:
         externRun(command);
         break;
