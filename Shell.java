@@ -35,6 +35,7 @@ public class Shell implements Runnable {
  char terminator;
  Pattern regex;
  boolean running = true;
+ boolean easterEgg = false;
 
  public Shell(String[] args, Properties prop, boolean isWindows) {
   options = prop;
@@ -69,6 +70,9 @@ public class Shell implements Runnable {
   block = prop.getProperty("BLOCK");
   debugPropFlag = Boolean.parseBoolean(prop.getProperty("DEBUG"));
   name = prop.getProperty("NAME");
+  if (prop.getProperty("WHOSTHEBEST") == "NOTYOU") {
+   easterEgg=true;
+  }
  }
 
  @Override
@@ -156,6 +160,8 @@ public class Shell implements Runnable {
 
  private List < String > splitLine(String line) {
   List < String > cmd = Arrays.asList(line.split(" "));
+  //List <String> cmd = Arrays.asList(line.split("\""));
+  debug(cmd.toString());
   return cmd;
  }
 
@@ -284,6 +290,9 @@ public class Shell implements Runnable {
   if (command.get(0) != "!") {
    lastCmd = String.join(" ", command);
   }
+  if(easterEgg) {
+   System.out.println("I am sorry :(. Please tell me, why I suck :(");
+  }
   return exitcode;
 
   /*
@@ -294,6 +303,7 @@ public class Shell implements Runnable {
  }
 
  private int externRun(List < String > command) {
+  debug(command.toString());
   try {
    ProcessBuilder pb = new ProcessBuilder(command);
    pb.directory(new File(getCurrentDir()));
