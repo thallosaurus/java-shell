@@ -5,21 +5,11 @@ import java.util.Properties;
 import java.io.FileNotFoundException;
 
 class Bootstrap {
-  private static String os = System.getProperty("os.name").toLowerCase();
-
-  private static boolean isWindows() {
-		if (os.indexOf("win") >= 0) {
-			return true;
-		} else {
-			return false;
-		}
-  }
-
   public static void main(String[] args) {
     Properties p = new Properties();
     try {
       BufferedInputStream stream = new BufferedInputStream(new FileInputStream("properties.conf"));
-      try {
+      try { 
         p.load(stream);
         stream.close();
       } catch (IOException i) {
@@ -28,9 +18,6 @@ class Bootstrap {
     } catch (FileNotFoundException f) {
       f.printStackTrace();
     }
-        System.out.println(p.getProperty("NAME") + " Shell");
-	Shell s = new Shell(args, p, isWindows());
-	Thread shell = new Thread(s);
-    shell.run();
+    Shell.run(args, p);
   }
 }

@@ -1,6 +1,8 @@
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.FileNotFoundException;
 import java.io.InputStreamReader;
+import java.io.FileOutputStream;
 import java.lang.ProcessBuilder;
 import java.util.List;
 import java.util.Arrays;
@@ -11,7 +13,7 @@ import java.util.Properties;
 import java.nio.file.Files;
 import java.lang.StringBuilder;
 import java.util.HashMap;
-
+import java.util.regex.Pattern;
 
 public class Shell implements Runnable {
  String currentDir;
@@ -27,35 +29,46 @@ public class Shell implements Runnable {
 
  static boolean debugPropFlag = false;
  static boolean debug = false;
-
  static String block;
- static boolean EXEC = true;
-
+ static String name;
+ //static boolean EXEC = true;
  char terminator;
+ Pattern regex;
+ boolean running = true;
 
- public Shell(String[] args, Properties prop, char os) {
+ public Shell(String[] args, Properties prop, boolean isWindows) {
   options = prop;
-  terminator = os;
+  if (isWindows) {
+   terminator = '\\';
+   regex = Pattern.compile("\\\\");
+  } else {
+   terminator = '/';
+   regex = Pattern.compile("/");
+  }
   currentFolder = new HashMap < Integer, String > ();
-
-  String[] userdir = System.getProperty("user.dir").split("\\\\");
+    String[] userdir = System.getProperty("user.dir").split(regex.toString());
   for (int i = 0; i < userdir.length; i++) {
    currentFolder.put(i, userdir[i]);
   }
   folderCursor = currentFolder.size() - 1;
-
   init(args, prop);
+ }
+
+ public void shutdown() {
+  running = false;
+  System.exit(0);
  }
 
  public void init(String[] args, Properties prop) {
   if (Arrays.asList(args).contains("--debug") || Arrays.asList(args).contains("-d")) {
    debug = true;
+   debug("Please report all bugs, thx");
   }
 
-  //set properties
+  //apply options
   block = prop.getProperty("BLOCK");
   debugPropFlag = Boolean.parseBoolean(prop.getProperty("DEBUG"));
-  EXEC = Boolean.parseBoolean(prop.getProperty("EXEC"));
+  name = prop.getProperty("NAME");
  }
 
  @Override
@@ -64,16 +77,14 @@ public class Shell implements Runnable {
   start();
  }
  public void start() {
-  /* Thread t = new Thread();
+/*  Thread t = new Thread();
     Runtime.getRuntime().addShutdownHook(new Thread() {
       public void run() {
-        Shell s = new Shell(null, null, '/');
-        if(s.hasExecuted) {
+        //Shell s = new Shell(null, null, '/');
+        if(this.hasExecuted) {
 			//if externalProcessIsRunning (forced by keystroke)
           s.p.destroy();
-        } else {
-			Runtime.getRuntime().exit(0);
-		}
+        }
       }
     }); */
 
@@ -109,13 +120,14 @@ public class Shell implements Runnable {
     return block;
   }
  }
+
  public void loop() {
   String line;
-  boolean status;
+  int status;
   inputBuffer = new BufferedReader(new InputStreamReader(System.in));
-
+  //System.out.println(name + " Shell");
   do {
-   line = readLine();
+   line = readLine(true, null);
    List < String > args = null;
    try {
     args = splitLine(line);
@@ -123,13 +135,18 @@ public class Shell implements Runnable {
     System.exit(0);
    }
    status = execProgram(args);
-  } while (status);
+   debug("Last line returned " + status);
+  } while (running);
  }
 
- private String readLine() {
+ private String readLine(boolean useBlock, String msg) {
   String words = new String();
   try {
-   System.out.print(outputBlock());
+   if (useBlock) {
+    System.out.print(outputBlock());
+   } else {
+    System.out.println(msg);
+   }
    words = inputBuffer.readLine();
   } catch (IOException e) {
    e.printStackTrace();
@@ -142,26 +159,42 @@ public class Shell implements Runnable {
   return cmd;
  }
 
- private boolean execProgram(List < String > command) {
-  debug("< " + String.join(" ", command));
+ private int execProgram(List < String > command) {
+  //debug("< " + String.join(" ", command));
   //shell builtin
-
+  int exitcode = 0;
   switch (command.get(0)) {
    case ("hello"):
     System.out.println("Hello, World");
     break;
    case ("help"):
-    System.out.println("Shell 0.1b ");
+    System.out.println("Shell 0.1b \n");
     System.out.println("Built-ins: ");
     System.out.println("hello - print 'Hello World'");
     System.out.println("exit - exits Shell");
     System.out.println("help - prints this text");
-    System.out.println("getdir - prints current directory [DEBUG MODE]");
-    System.out.println("! - re-run last command [NON WORKING]");
+    debug("getdir - prints current directory [DEBUG MODE]");
+    System.out.println("info - print info text");
+    debug("! - re-run last command [NON WORKING]");
+    debug("live_in_coalmine");
+    debug("test_errorcodes - test if errorcodes are working");
+    debug("setproperty - sets properties");
+    System.out.println("cd - changes current working directory");
     break;
    case ("exit"):
-    System.out.println("Godbye!");
-    System.exit(0);
+    shutdown();
+    break;
+   case("live_in_coalmine"):
+    System.out.println("Set DEBUG in properties.conf to true. Set it to false, to disable Debug Mode.");
+    System.out.println("...or run the shell with --debug");
+    break;
+   case "setproperty":
+    if (command.size() == 3) {
+     options.setProperty(command.get(1), command.get(2));
+    } else {
+     System.out.println("setpropery: <KEY> <PROP>");
+    }
+    break;
    case ("getdir"):
     //debug(currentFolder);
     System.out.println(currentFolder);
@@ -169,8 +202,25 @@ public class Shell implements Runnable {
      System.out.println("Enable Debug mode to run this command");
     }
     break;
+   case "info":
+    System.out.println("info goes here");
+    break;
+   case "test_errorcodes":
+    debug("Enter code from 0 to 255");
+    int lvl = 0;
+    try {
+     lvl = Integer.parseInt(readLine(false, "[0-255]"));
+    } catch (java.lang.NumberFormatException n) {
+     debug("Input was not a Number");
+    }
+    if (lvl < 256 && lvl > -1) {
+     exitcode = lvl;
+    } else {
+     debug("please input a number from 0 to 256");
+    }
+    break;
    case ("!"):
-    System.out.println(lastCmd);
+    debug(lastCmd);
     try {
      externRun(splitLine(lastCmd));
     } catch (NullPointerException e) {
@@ -179,20 +229,38 @@ public class Shell implements Runnable {
     }
     break;
    case "meow":
-    System.out.println("Meow.");
+    System.out.println("My cat told me she was hungry and I stroked her fur.\n\n");
+    System.out.println("Needless to say, my hand is now covered by several scratches...\n\n");
+    System.out.println("Ok, then.");
     break;
+
+   case "TODO":
+    //see your TODO list inside the program!
+    //append your stuff so you'll never have to search again!
+    debug("append your things to this list to see, what you want to do here.\n");
+    debug("ASM Emulator");
+    debug("Fix ^C (CRTL-C) Shutdownhook");
+    debug("argument folder");
+    debug("fix re-run command (!)");
+   break;
    case "cd":
     StringBuilder completePath = new StringBuilder(); //strings
     //completePath.append(String.join("\\", currentFolder));
-    debug("Complete String: " + getCurrentDir());
+    //debug("Complete String: " + getCurrentDir());
     if (command.size() == 1 || command.get(1).equals("--help")) {
      System.out.println("cd: Help me."); //TODO Help
      break;
-    } else if (command.get(1).equals("..") && folderCursor != 0) {
-     currentFolder.remove(folderCursor);
-     folderCursor--;
-     debug("cd: " + currentFolder.toString());
-     debug(folderCursor);
+    } else if (command.get(1).equals("..")) {
+     if (folderCursor > 0) {
+      currentFolder.remove(folderCursor);
+      folderCursor--;
+      //System.out.println("cd: " + currentFolder.toString());
+      //debug(folderCursor);
+      //System.setProperty("user.dir", getCurrentDir());
+     } else {
+      System.out.println("Can't, already at root dir...");
+      exitcode = 2;
+     }
      break;
     } else {
      //check if directory exists
@@ -200,18 +268,23 @@ public class Shell implements Runnable {
      if (f.isDirectory()) {
       folderCursor++;
       currentFolder.put(folderCursor, command.get(1));
-      debug("cd: " + currentFolder.toString());
+      //debug("cd: " + currentFolder.toString());
+      //System.setProperty("user.dir", getCurrentDir());
       break;
      } else {
-      debug("folder not found");
+      System.out.println("folder not found");
+      exitcode = 1;
       break;
      }
     }
    default:
-    externRun(command);
+    exitcode = externRun(command);
     break;
   }
-  return true;
+  if (command.get(0) != "!") {
+   lastCmd = String.join(" ", command);
+  }
+  return exitcode;
 
   /*
    * return true, if you want to continue execution of the shell
@@ -220,16 +293,16 @@ public class Shell implements Runnable {
    */
  }
 
- private boolean externRun(List < String > command) {
+ private int externRun(List < String > command) {
   try {
-   p = new ProcessBuilder(command).inheritIO().start();
+   ProcessBuilder pb = new ProcessBuilder(command);
+   pb.directory(new File(getCurrentDir()));
+   p = pb.inheritIO().start();
    hasExecuted = true; //sets the exec flag true for shutdown hook
    try {
     p.waitFor();
-    debug("Exit Value: " + p.exitValue());
     hasExecuted = false; //releases hook
-    lastCmd = String.join(" ", command);
-    return true;
+    return p.exitValue();
    } catch (InterruptedException e) {
     e.printStackTrace();
    }
@@ -238,6 +311,6 @@ public class Shell implements Runnable {
    System.out.println(command.get(0) + ": not found");
    //e.printStackTrace();
   }
-  return true;
+  return 1;
  }
 }
