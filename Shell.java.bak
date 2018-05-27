@@ -16,6 +16,7 @@ import java.util.HashMap;
 import java.util.regex.Pattern;
 
 public class Shell implements Runnable {
+ String currentDir;
  BufferedReader inputBuffer = null;
  Process p;
  Properties options;
@@ -193,14 +194,9 @@ public class Shell implements Runnable {
     }
     break;
    case "builtin":
-    //if (dbg.getDebugState()) {
-     try {
-      exitcode = pluginManager.exec(command, currentFolder);
-     } catch (Exception e) {
-      e.printStackTrace();
-     }
-     //public int exec(List <String> command, HashMap<Integer, String> currentFolder);
-    //}
+    if (dbg.getDebugState()) {
+     pluginManager.exec(command.get(1), command.get(2));
+    }
     break;
    case "setproperty":
     if (command.size() == 3) {
@@ -210,8 +206,8 @@ public class Shell implements Runnable {
     }
     break;
    case ("getdir"):
-    dbg.debug("getdir", currentFolder);
-    //System.out.println(currentFolder);
+    //debug(currentFolder);
+    System.out.println(currentFolder);
     if (dbg.getDebugState()) {
      System.out.println("Enable Debug mode to run this command");
     }
